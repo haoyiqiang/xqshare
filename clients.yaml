@@ -1,0 +1,14 @@
+# xqshare 客户端配置
+# 客户端连接时使用：
+#   XQSHARE_CLIENT_ID=client-standard
+#   XQSHARE_CLIENT_SECRET=rYkBpcYh_UxIilVRWSud83Cjuh2dgEBBy-Ug-vqviYw
+
+clients:
+  client-standard:
+    secret: "rYkBpcYh_UxIilVRWSud83Cjuh2dgEBBy-Ug-vqviYw"
+    level: standard
+
+  # 如需允许完整交易（下单/撤单），可将 level 改为 enterprise，或另建 enterprise 客户端：
+  # client-trade:
+  #   secret: "请替换为另一串强密码"
+  #   level: enterprise
