@@ -15,6 +15,7 @@ from datetime import datetime
 # 默认客户端配置（与服务端保持一致）
 DEFAULT_CLIENT_ID = "client-standard"
 DEFAULT_CLIENT_SECRET = "xqshare-default-secret"
+DEFAULT_SYNC_REQUEST_TIMEOUT = 3600
 
 
 # ==================== 日志配置 ====================
@@ -312,6 +313,7 @@ class XtQuantRemote:
         auto_reconnect=True,
         max_retries=5,
         heartbeat_interval=30,
+        sync_request_timeout=None,
         log_level="INFO",
         env_file=None,
     ):
@@ -331,6 +333,15 @@ class XtQuantRemote:
             client_id = os.environ.get("XQSHARE_CLIENT_ID", DEFAULT_CLIENT_ID)
         if client_secret is None:
             client_secret = os.environ.get("XQSHARE_CLIENT_SECRET", DEFAULT_CLIENT_SECRET)
+        if sync_request_timeout is None:
+            sync_request_timeout = float(
+                os.environ.get(
+                    "XQSHARE_SYNC_REQUEST_TIMEOUT",
+                    str(DEFAULT_SYNC_REQUEST_TIMEOUT),
+                )
+            )
+        if sync_request_timeout <= 0:
+            raise ValueError("sync_request_timeout must be greater than 0")
 
         self._host = host
         self._port = port
@@ -341,6 +352,7 @@ class XtQuantRemote:
         self._auto_reconnect = auto_reconnect
         self._reconnect_policy = ReconnectPolicy(max_retries=max_retries)
         self._heartbeat_interval = heartbeat_interval
+        self._sync_request_timeout = float(sync_request_timeout)
         self._log_level = log_level
 
         self._conn = None
@@ -351,6 +363,7 @@ class XtQuantRemote:
         self._stop_heartbeat = threading.Event()
         self._bg_thread = None  # BgServingThread for async callbacks
         self._account_level = None  # 账号等级
+        self._subscriptions = []
 
         self._xtdata = RemoteModule(self, 'xtdata')
         self._xttype = RemoteModule(self, 'xttype')
@@ -387,7 +400,7 @@ class XtQuantRemote:
             'allow_setattr': True,
             'allow_delattr': True,
             'allow_all_attrs': True,
-            'sync_request_timeout': 300,
+            'sync_request_timeout': self._sync_request_timeout,
         }
         
         ssl_context = self._create_ssl_context()
@@ -462,6 +475,13 @@ class XtQuantRemote:
                     self._conn = None
                     self._connected = False
                     self._token = None
+                    for module in (
+                        self._xtdata,
+                        self._xttype,
+                        self._xtconstant,
+                        self._xtview,
+                    ):
+                        module._module = None
                     self._connect()
                     
                     for sub in self._subscriptions:
