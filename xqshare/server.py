@@ -21,6 +21,7 @@ from .auth import (
     Permission,
     get_permission_checker,
 )
+from .market_data import MarketDataInitializationError, MarketDataRuntime
 
 # Import xtquant (only available on Windows)
 try:
@@ -37,6 +38,11 @@ except ImportError:
     xttype = None
     xtconstant = None
     XtQuantTrader = None
+
+try:
+    from xtquant import xtdatacenter as xtdc
+except ImportError:
+    xtdc = None
 
 # xtview 模块单独导入（某些版本可能不存在）
 try:
@@ -336,6 +342,7 @@ class XtQuantService(rpyc.Service):
     _xtconstant = xtconstant
     _xtview = xtview
     _permission_checker = None  # 类级别的权限检查器
+    _market_data_runtime = None  # 服务端共享的行情运行时
 
     def on_connect(self, conn):
         self._conn = conn
@@ -540,9 +547,16 @@ class XtQuantService(rpyc.Service):
     @log_api_call("get_service_status")
     def exposed_get_service_status(self):
         self._require_auth()
+        runtime = XtQuantService._market_data_runtime
+        market_data_status = runtime.get_status() if runtime is not None else {
+            "initialized": False,
+            "ready": False,
+            "mode": None,
+        }
         return {
             "uptime": time.time() - getattr(self, '_start_time', time.time()),
             "client_id": self._client_id,
+            "market_data": market_data_status,
         }
 
     @log_api_call("ping")
@@ -624,12 +638,28 @@ def start_server(host="0.0.0.0", port=None, use_ssl=False, certfile=None, keyfil
     _init_logging(log_level)
     XtQuantService._start_time = time.time()
 
+    # 在 RPyC 对外提供 xtdata 前先初始化共享行情连接。
+    # token 模式直接连接迅投行情，不依赖 QMT/MiniQMT 客户端。
+    market_runtime = MarketDataRuntime(xtdc, xtdata)
+    try:
+        market_status = market_runtime.initialize()
+    except MarketDataInitializationError as exc:
+        logger.error(f"行情初始化失败: {exc}")
+        print(f"错误: {exc}")
+        raise
+    XtQuantService._market_data_runtime = market_runtime
+
     print("=" * 70)
     print("  XtQuant Share (xqshare) 服务")
     print("=" * 70)
     print(f"  监听地址: {host}:{port}")
     print(f"  SSL 加密: {'启用' if use_ssl else '禁用'}")
     print(f"  日志级别: {log_level}")
+    print(f"  行情模式: {market_status['mode']}")
+    if market_status['mode'] == 'token':
+        print(f"  XTDC地址: 127.0.0.1:{market_status['listen_port']}")
+        print(f"  K线全推: {'启用' if market_status['kline_mirror_enabled'] else '禁用'}")
+        print(f"  初始化市场: {','.join(market_status['init_markets'])}")
     print("=" * 70)
     
     # 预加载权限检查器（加载 clients.yaml 配置）
@@ -717,8 +747,11 @@ def main():
   xqshare-server --ssl --cert cert.pem --key key.pem  # 启用 SSL
 
 环境变量:
-  XQSHARE_PORT      服务端口 (默认: 18812)
-  QMT_USERDATA_PATH QMT userdata_mini 目录路径
+  XQSHARE_PORT        服务端口 (默认: 18812)
+  XQSHARE_MARKET_MODE 行情模式 token/qmt (默认: token)
+  XT_TOKEN            迅投行情接口 Token (token 模式必填)
+  XT_DATA_HOME         xtdatacenter 数据缓存目录
+  QMT_USERDATA_PATH   QMT userdata_mini 目录路径（仅交易需要）
         """
     )
     parser.add_argument("--host", default="0.0.0.0", help="监听地址 (默认: 0.0.0.0)")

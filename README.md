@@ -33,38 +33,52 @@
 pip install xqshare
 ```
 
-### 从源码安装
+### 从源码安装（使用 uv）
 
 ```bash
 # Gitee（国内推荐）
 git clone https://gitee.com/jdragonhu/xqshare.git
-
-# GitHub（备用）
-git clone https://github.com/jasonhu/xqshare.git
-
+# git clone https://github.com/jasonhu/xqshare.git
 cd xqshare
-pip install -e .
-```
-
-### 依赖
-
-```bash
-pip install rpyc
+uv sync
 ```
 
 ## 快速启动
 
 ### 启动前准备
 
-**服务端（Windows）：** Python 环境 | 启动 miniQMT 并登录 | `pip install xqshare pyyaml`
+**服务端（Windows）：** 安装支持 `xtdatacenter` 的 xtquant，并在 `.env` 中配置迅投接口 Token。只使用行情时无需启动 QMT/MiniQMT；使用交易功能时仍需启动并登录 QMT。
 
 **客户端（macOS/Linux）：** Python 环境 | `pip install xqshare`
 
 ### 服务器 Windows 快速启动
-
 ```powershell
-python -m xqshare.server
+Copy-Item .env.server.example .env
+# 编辑 .env，填写 XT_TOKEN
+uv run xqshare-server
 ```
+
+默认的 `XQSHARE_MARKET_MODE=token` 会在 RPyC 服务启动前初始化 `xtdatacenter`、连接 VIP 行情服务器并开启沪深 K线全推。若需临时恢复旧的 QMT 行情连接，可设置：
+
+```env
+XQSHARE_MARKET_MODE=qmt
+```
+
+主要行情环境变量：
+
+| 环境变量 | 默认值 | 说明 |
+|---|---|---|
+| `XQSHARE_MARKET_MODE` | `token` | `token` 脱离 QMT；`qmt` 保留旧模式 |
+| `XT_TOKEN` | - | 迅投接口 Token，token 模式必填 |
+| `XT_DATA_HOME` | `.xtdata-cache` | xtdatacenter 数据缓存目录 |
+| `XTDC_PORT_START` | `58620` | 本地数据服务端口范围起点 |
+| `XTDC_PORT_END` | `58650` | 本地数据服务端口范围终点 |
+| `XT_KLINE_MIRROR` | `true` | 是否开启 VIP K线全推 |
+| `XT_INIT_MARKETS` | `SH,SZ` | 初始化的行情市场 |
+| `XT_KLINE_MIRROR_MARKETS` | `SH,SZ` | 开启 K线全推的市场 |
+| `XT_VIP_SERVERS` | 内置官方站点池 | 可选，自定义 VIP 行情服务器池 |
+
+Token 模式只替代 `xtdata` 行情连接。`XtQuantTrader` 查询账户、下单和撤单仍需要 `QMT_USERDATA_PATH` 以及已启动登录的 QMT。
 
 ### 客户端快速测试
 
