@@ -151,6 +151,7 @@ xttrader --account-id "12345678" order_stock --stock-code "000001.SZ" --order-ty
 # 设置环境变量
 export XQSHARE_REMOTE_HOST="192.168.1.100"
 export XQSHARE_CLIENT_SECRET="your-secret"
+export XQSHARE_SYNC_REQUEST_TIMEOUT="3600"  # 长时间批量下载默认等待1小时
 
 # 获取股票列表
 python examples/get_stock_list.py --sector "沪深300"
@@ -356,6 +357,7 @@ xt = XtQuantRemote("192.168.1.100", log_level="DEBUG")
 | auto_reconnect | 自动重连 | True |
 | max_retries | 最大重试次数 | 5 |
 | heartbeat_interval | 心跳间隔(秒) | 30 |
+| sync_request_timeout | 同步RPC请求超时(秒)，也可由 XQSHARE_SYNC_REQUEST_TIMEOUT 设置 | 3600 |
 | log_level | 日志级别 | INFO |
 | callback_port | 回调服务器端口 | 0(自动) |
 
@@ -369,6 +371,7 @@ xt = XtQuantRemote("192.168.1.100", log_level="DEBUG")
 | --cert | SSL 证书文件 | - |
 | --key | SSL 私钥文件 | - |
 | --log-level | 日志级别 | INFO |
+| --sync-request-timeout | 同步RPC请求超时(秒) | 3600 |
 
 ---
 

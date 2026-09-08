@@ -595,7 +595,7 @@ def create_ssl_context(certfile=None, keyfile=None):
     return ctx
 
 
-def start_server(host="0.0.0.0", port=None, use_ssl=False, certfile=None, keyfile=None, log_level="INFO", env_file=None):
+def start_server(host="0.0.0.0", port=None, use_ssl=False, certfile=None, keyfile=None, log_level="INFO", env_file=None, sync_request_timeout=None):
     """启动服务
 
     Args:
@@ -616,6 +616,12 @@ def start_server(host="0.0.0.0", port=None, use_ssl=False, certfile=None, keyfil
 
     if port is None:
         port = int(os.environ.get("XQSHARE_PORT", "18812"))
+    if sync_request_timeout is None:
+        sync_request_timeout = float(
+            os.environ.get("XQSHARE_SYNC_REQUEST_TIMEOUT", "3600")
+        )
+    if sync_request_timeout <= 0:
+        raise ValueError("sync_request_timeout must be greater than 0")
 
     if not XTQUANT_AVAILABLE:
         print("错误: xtquant 库未安装，请先安装 xtquant")
@@ -645,7 +651,7 @@ def start_server(host="0.0.0.0", port=None, use_ssl=False, certfile=None, keyfil
         'allow_setattr': True,
         'allow_delattr': True,
         'allow_all_attrs': True,
-        'sync_request_timeout': 300,
+        'sync_request_timeout': float(sync_request_timeout),
     }
     
     ssl_context = None
@@ -719,6 +725,7 @@ def main():
 环境变量:
   XQSHARE_PORT      服务端口 (默认: 18812)
   QMT_USERDATA_PATH QMT userdata_mini 目录路径
+  XQSHARE_SYNC_REQUEST_TIMEOUT 同步请求超时秒数 (默认: 3600)
         """
     )
     parser.add_argument("--host", default="0.0.0.0", help="监听地址 (默认: 0.0.0.0)")
@@ -727,6 +734,12 @@ def main():
     parser.add_argument("--cert", help="SSL 证书文件")
     parser.add_argument("--key", help="SSL 私钥文件")
     parser.add_argument("--log-level", default="INFO", help="日志级别 (默认: INFO)")
+    parser.add_argument(
+        "--sync-request-timeout",
+        type=float,
+        default=None,
+        help="同步请求超时秒数 (默认: 3600 或 XQSHARE_SYNC_REQUEST_TIMEOUT)",
+    )
     parser.add_argument("--env-file", default=".env", help="环境变量文件 (默认: .env)")
 
     args = parser.parse_args()
@@ -738,7 +751,8 @@ def main():
         certfile=args.cert,
         keyfile=args.key,
         log_level=args.log_level,
-        env_file=args.env_file
+        env_file=args.env_file,
+        sync_request_timeout=args.sync_request_timeout,
     )
 
 
